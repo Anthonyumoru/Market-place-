@@ -1,10 +1,8 @@
-// For now - demo mode. Products save in memory, disappear on refresh
-// Next step: Connect Supabase for permanent storage
+import { createClient } from '@supabase/supabase-js';
 
-let products = [
-  {id: 1, name: 'Airpods Pro Max', price: 85000, description: 'ANC + Spatial Audio', image: 'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=400', seller_id: 'demo'}
-];
-let sellers = [];
+const SUPABASE_URL = 'https://lacmqfoqgifmigcrrlqa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhY21xZm9xZ2lmbWlnY3JybHFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NzM4MDIsImV4cCI6MjA5NjM0OTgwMn0.YjMOUYEwz_ne4D7wRJ9J0xoC6Cvbx7z0CcKuD9SxO18';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export async function handler(event) {
   const headers = {
@@ -12,48 +10,41 @@ export async function handler(event) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
   };
-  
+
   if (event.httpMethod === 'OPTIONS') return {statusCode: 200, headers, body: ''};
-  
+
   const path = event.path.replace('/.netlify/functions/api', '');
-  const body = event.body ? JSON.parse(event.body) : {};
-  
-  // Get products for buyers
+  const body = event.body? JSON.parse(event.body) : {};
+
   if (path === '/products' && event.httpMethod === 'GET') {
-    return {statusCode: 200, headers, body: JSON.stringify(products)};
+    const { data, error } = await supabase.from('products').select('*').order('created_at', {ascending: false});
+    if(error) return {statusCode: 500, headers, body: JSON.stringify({error: error.message})};
+    return {statusCode: 200, headers, body: JSON.stringify(data || [])};
   }
-  
-  // Seller signup
+
   if (path === '/seller/signup' && event.httpMethod === 'POST') {
-    const token = 'seller-' + Date.now();
-    sellers.push({email: body.email, token, type: 'seller'});
-    return {statusCode: 200, headers, body: JSON.stringify({token, message: 'Seller account created'})};
+    const { data, error } = await supabase.from('sellers').insert([{email: body.email, password: body.password}]).select();
+    if(error) return {statusCode: 400, headers, body: JSON.stringify({error: error.message})};
+    return {statusCode: 200, headers, body: JSON.stringify({token: data[0].id, message: 'Seller account created'})};
   }
-  
-  // Seller signin  
+
   if (path === '/seller/signin' && event.httpMethod === 'POST') {
-    const seller = sellers.find(s => s.email === body.email);
-    if(seller) return {statusCode: 200, headers, body: JSON.stringify({token: seller.token})};
-    return {statusCode: 401, headers, body: JSON.stringify({error: 'Invalid login'})};
+    const { data } = await supabase.from('sellers').select().eq('email', body.email).eq('password', body.password).single();
+    if(!data) return {statusCode: 401, headers, body: JSON.stringify({error: 'Invalid login'})};
+    return {statusCode: 200, headers, body: JSON.stringify({token: data.id})};
   }
-  
-  // Add product
+
   if (path === '/seller/products' && event.httpMethod === 'POST') {
     const token = event.headers.authorization?.replace('Bearer ', '');
     if(!token) return {statusCode: 401, headers, body: JSON.stringify({error: 'Login first'})};
-    
-    const newProduct = {
-      id: Date.now(),
-      ...body,
-      seller_id: token
-    };
-    products.push(newProduct);
-    return {statusCode: 200, headers, body: JSON.stringify({message: 'Product added! Refresh buyer page to see it'})};
+    const { error } = await supabase.from('products').insert([{...body, seller_id: token}]);
+    if(error) return {statusCode: 400, headers, body: JSON.stringify({error: error.message})};
+    return {statusCode: 200, headers, body: JSON.stringify({message: 'Product added! Refresh buyer page'})};
   }
-  
+
   if (path === '/test') {
-    return {statusCode: 200, headers, body: JSON.stringify({status: 'API is live on Netlify'})};
+    return {statusCode: 200, headers, body: JSON.stringify({status: 'API + Database connected'})};
   }
-  
+
   return {statusCode: 404, headers, body: JSON.stringify({error: 'Not found'})};
 }
