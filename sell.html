@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Dashboard - Naija Marketplace</title>
+<style>
+body{font-family:'Segoe UI',sans-serif;background:#f5f5f5;padding:20px}
+.box{background:white;padding:25px;border-radius:10px;max-width:500px;margin:50px auto;box-shadow:0 2px 10px rgba(0,0,0,0.1)}
+input,textarea{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:5px}
+.btn{width:100%;padding:12px;border:none;background:#1a1a1a;color:white;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:10px}
+.btn-orange{background:#ff6b00}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="box" id="loginBox">
+  <h2>Seller Login / Signup</h2>
+  <input type="email" id="sEmail" placeholder="Email">
+  <input type="password" id="sPassword" placeholder="Password">
+  <button class="btn" onclick="sellerSignup()">Sign Up as Seller</button>
+  <button class="btn btn-orange" onclick="sellerSignin()">Login</button>
+</div>
+
+<div class="box hidden" id="dashboardBox">
+  <h2>Add New Product</h2>
+  <input type="text" id="pName" placeholder="Product Name">
+  <input type="number" id="pPrice" placeholder="Price in Naira">
+  <textarea id="pDesc" placeholder="Description"></textarea>
+  <input type="url" id="pImage" placeholder="Image URL - upload to imgur.com first">
+  <input type="text" id="pBank" placeholder="Bank Account Number">
+  <input type="text" id="pBankName" placeholder="Bank Name - GTBank, Access, etc">
+  <input type="text" id="pAccName" placeholder="Account Name">
+  <button class="btn btn-orange" onclick="addProduct()">Submit Product</button>
+  <button class="btn" onclick="logout()">Logout</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+const API_URL = 'https://endearing-gaufre-742591.netlify.app/.netlify/functions/api';
+let sToken = localStorage.getItem('sellerToken');
+
+if(sToken) showDashboard();
+
+async function sellerSignup(){
+  const email = document.getElementById('sEmail').value;
+  const password = document.getElementById('sPassword').value;
+  const res = await fetch(API_URL + '/seller/signup', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({email, password, type: 'seller'})
+  });
+  const data = await res.json();
+  if(data.token){ sToken = data.token; localStorage.setItem('sellerToken', sToken); showDashboard(); }
+  else alert(data.error)
+}
+
+async function sellerSignin(){
+  const email = document.getElementById('sEmail').value;
+  const password = document.getElementById('sPassword').value;
+  const res = await fetch(API_URL + '/seller/signin', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({email, password})
+  });
+  const data = await res.json();
+  if(data.token){ sToken = data.token; localStorage.setItem('sellerToken', sToken); showDashboard(); }
+  else alert(data.error)
+}
+
+function showDashboard(){
+  document.getElementById('loginBox').classList.add('hidden');
+  document.getElementById('dashboardBox').classList.remove('hidden');
+}
+
+async function addProduct(){
+  const product = {
+    name: document.getElementById('pName').value,
+    price: document.getElementById('pPrice').value,
+    description: document.getElementById('pDesc').value,
+    image: document.getElementById('pImage').value,
+    bank_account: document.getElementById('pBank').value,
+    bank_name: document.getElementById('pBankName').value,
+    account_name: document.getElementById('pAccName').value
+  };
+  
+  const res = await fetch(API_URL + '/seller/products', {
+    method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer ' + sToken},
+    body: JSON.stringify(product)
+  });
+  const data = await res.json();
+  document.getElementById('msg').innerHTML = '<p style="color:green">' + data.message + '</p>';
+}
+
+function logout(){
+  localStorage.removeItem('sellerToken');
+  location.reload();
+}
+</script>
+</body>
+  </html>
