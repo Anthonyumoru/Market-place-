@@ -1,3 +1,11 @@
+// For now - demo mode. Products save in memory, disappear on refresh
+// Next step: Connect Supabase for permanent storage
+
+let products = [
+  {id: 1, name: 'Airpods Pro Max', price: 85000, description: 'ANC + Spatial Audio', image: 'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=400', seller_id: 'demo'}
+];
+let sellers = [];
+
 export async function handler(event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -8,33 +16,43 @@ export async function handler(event) {
   if (event.httpMethod === 'OPTIONS') return {statusCode: 200, headers, body: ''};
   
   const path = event.path.replace('/.netlify/functions/api', '');
+  const body = event.body ? JSON.parse(event.body) : {};
   
+  // Get products for buyers
   if (path === '/products' && event.httpMethod === 'GET') {
-    return {
-      statusCode: 200, headers,
-      body: JSON.stringify([
-        {id: 1, name: 'Airpods Pro Max', price: 85000, description: 'ANC + Spatial Audio', image: 'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=400'},
-        {id: 2, name: 'Power Bank 20000mAh', price: 12000, description: 'Fast charging', image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400'},
-        {id: 3, name: 'Wireless Mouse', price: 6500, description: 'Ergonomic design', image: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=400'},
-        {id: 4, name: 'USB-C Cable 2m', price: 2500, description: 'Fast charging cable', image: 'https://images.unsplash.com/photo-1583863788434-e91a977112f8?w=400'}
-      ])
+    return {statusCode: 200, headers, body: JSON.stringify(products)};
+  }
+  
+  // Seller signup
+  if (path === '/seller/signup' && event.httpMethod === 'POST') {
+    const token = 'seller-' + Date.now();
+    sellers.push({email: body.email, token, type: 'seller'});
+    return {statusCode: 200, headers, body: JSON.stringify({token, message: 'Seller account created'})};
+  }
+  
+  // Seller signin  
+  if (path === '/seller/signin' && event.httpMethod === 'POST') {
+    const seller = sellers.find(s => s.email === body.email);
+    if(seller) return {statusCode: 200, headers, body: JSON.stringify({token: seller.token})};
+    return {statusCode: 401, headers, body: JSON.stringify({error: 'Invalid login'})};
+  }
+  
+  // Add product
+  if (path === '/seller/products' && event.httpMethod === 'POST') {
+    const token = event.headers.authorization?.replace('Bearer ', '');
+    if(!token) return {statusCode: 401, headers, body: JSON.stringify({error: 'Login first'})};
+    
+    const newProduct = {
+      id: Date.now(),
+      ...body,
+      seller_id: token
     };
+    products.push(newProduct);
+    return {statusCode: 200, headers, body: JSON.stringify({message: 'Product added! Refresh buyer page to see it'})};
   }
   
   if (path === '/test') {
     return {statusCode: 200, headers, body: JSON.stringify({status: 'API is live on Netlify'})};
-  }
-  
-  if (path === '/signup' && event.httpMethod === 'POST') {
-    return {statusCode: 200, headers, body: JSON.stringify({token: 'demo-token-123', message: 'Account created'})};
-  }
-  
-  if (path === '/signin' && event.httpMethod === 'POST') {
-    return {statusCode: 200, headers, body: JSON.stringify({token: 'demo-token-123', message: 'Welcome back'})};
-  }
-  
-  if (path === '/orders' && event.httpMethod === 'POST') {
-    return {statusCode: 200, headers, body: JSON.stringify({message: 'Order placed! We will contact you soon'})};
   }
   
   return {statusCode: 404, headers, body: JSON.stringify({error: 'Not found'})};
