@@ -1,6 +1,6 @@
 Market-place-/
 ├── index.html
-└── netlify/
+└── vercel/
     └── functions/
         ├── api.js
         └── package.json
